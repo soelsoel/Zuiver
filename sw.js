@@ -1,5 +1,5 @@
 /* Zuiver service worker — app shell offline beschikbaar */
-const CACHE = "zuiver-v1";
+const CACHE = "zuiver-v2";
 const SHELL = [
   "./",
   "./index.html",

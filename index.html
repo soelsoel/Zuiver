@@ -196,6 +196,27 @@ input[type=range]::-webkit-slider-thumb{
 #micState{font-size:.68rem;color:var(--ink-dim);min-width:56px;text-align:right}
 #micState.live{color:var(--good)}
 
+/* ───── axis controls ───── */
+.axis-controls{
+  display:flex;justify-content:center;gap:10px;
+  padding:0 12px 2px;
+}
+.axis-ctl{
+  display:flex;align-items:center;gap:2px;
+  background:var(--bg-raise);border:1px solid var(--line);border-radius:10px;
+  padding:3px 5px;
+}
+.axis-ctl .axis-lbl{
+  font-size:.6rem;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-dim);
+  margin:0 4px 0 2px;
+}
+.axis-ctl button{
+  width:26px;height:26px;border:none;background:none;color:var(--varnish);
+  font-size:1.05rem;font-weight:600;cursor:pointer;border-radius:7px;font-family:'Outfit';
+}
+.axis-ctl button:active{background:var(--line)}
+.axis-ctl b{font-size:.74rem;min-width:42px;text-align:center;color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+
 /* ───── start overlay ───── */
 .overlay{
   position:fixed;inset:0;background:var(--bg);
@@ -267,7 +288,22 @@ input[type=range]::-webkit-slider-thumb{
 
 <div class="trace-wrap">
   <canvas id="trace"></canvas>
-  <div class="trace-label">toonhoogtespoor · 8 s</div>
+  <div class="trace-label" id="traceLabel">toonhoogtespoor · 8 s</div>
+</div>
+
+<div class="axis-controls">
+  <div class="axis-ctl">
+    <span class="axis-lbl">Tijd</span>
+    <button id="xMinus" aria-label="Tijdvenster verkleinen">−</button>
+    <b id="xVal">8 s</b>
+    <button id="xPlus" aria-label="Tijdvenster vergroten">+</button>
+  </div>
+  <div class="axis-ctl">
+    <span class="axis-lbl">Bereik</span>
+    <button id="yMinus" aria-label="Inzoomen">−</button>
+    <b id="yVal">9 ht</b>
+    <button id="yPlus" aria-label="Uitzoomen">+</button>
+  </div>
 </div>
 
 <div class="footer">
@@ -292,7 +328,16 @@ let recentFreqs=[];
 
 /* trace data: {t, midi, cents} or {t, midi:null} for gaps */
 const samples=[];
-const TRACE_SEC=8;
+const X_STEPS=[3,5,8,12,16,20];          /* tijdvenster in seconden */
+const Y_STEPS=[5,7,9,12,15,19,24];       /* zichtbaar bereik in halve tonen */
+let xIdx=2, yIdx=2;                       /* default 8 s, 9 ht */
+let TRACE_SEC=X_STEPS[xIdx];
+let traceSpan=Y_STEPS[yIdx];
+try{
+  const sx=localStorage.getItem('zuiver_x'); if(sx!==null)xIdx=Math.min(X_STEPS.length-1,Math.max(0,+sx));
+  const sy=localStorage.getItem('zuiver_y'); if(sy!==null)yIdx=Math.min(Y_STEPS.length-1,Math.max(0,+sy));
+  TRACE_SEC=X_STEPS[xIdx]; traceSpan=Y_STEPS[yIdx];
+}catch(e){}
 let viewCenter=50; /* midi center of trace view (D3) */
 
 /* ============ dom ============ */
@@ -335,6 +380,21 @@ $('sens').oninput=e=>{
   rmsThreshold=0.045*Math.pow(0.0018/0.045,(s-1)/9);
 };
 $('sens').oninput({target:$('sens')});
+
+/* axis steppers */
+function applyAxes(){
+  TRACE_SEC=X_STEPS[xIdx];
+  traceSpan=Y_STEPS[yIdx];
+  $('xVal').textContent=TRACE_SEC+' s';
+  $('yVal').textContent=traceSpan+' ht';
+  $('traceLabel').textContent='toonhoogtespoor · '+TRACE_SEC+' s';
+  try{localStorage.setItem('zuiver_x',xIdx);localStorage.setItem('zuiver_y',yIdx);}catch(e){}
+}
+$('xMinus').onclick=()=>{if(xIdx>0){xIdx--;applyAxes();}};
+$('xPlus').onclick=()=>{if(xIdx<X_STEPS.length-1){xIdx++;applyAxes();}};
+$('yMinus').onclick=()=>{if(yIdx>0){yIdx--;applyAxes();}};   /* − = inzoomen (kleiner bereik) */
+$('yPlus').onclick=()=>{if(yIdx<Y_STEPS.length-1){yIdx++;applyAxes();}};
+applyAxes();
 
 /* ============ audio ============ */
 startBtn.onclick=async()=>{
@@ -504,7 +564,7 @@ function drawTrace(tNow){
     const tgt=median(recent);
     viewCenter+=(tgt-viewCenter)*0.06;
   }
-  const SPAN=9; /* semitones visible */
+  const SPAN=traceSpan; /* semitones visible (instelbaar) */
   const mTop=viewCenter+SPAN/2, mBot=viewCenter-SPAN/2;
   const yOf=m=>H*(mTop-m)/SPAN;
   const xOf=t=>W*(1-(tNow-t)/TRACE_SEC);
@@ -515,6 +575,7 @@ function drawTrace(tNow){
   /* semitone gridlines + labels */
   ctx2d.font='10px Outfit, sans-serif';
   ctx2d.textBaseline='middle';
+  const pxPer=H/SPAN;
   for(let m=Math.ceil(mBot);m<=Math.floor(mTop);m++){
     const y=yOf(m);
     const name=NOTE_NAMES[((m%12)+12)%12];
@@ -523,9 +584,13 @@ function drawTrace(tNow){
     ctx2d.globalAlpha=natural?0.9:0.35;
     ctx2d.lineWidth=natural?1:0.5;
     ctx2d.beginPath();ctx2d.moveTo(0,y);ctx2d.lineTo(W,y);ctx2d.stroke();
-    ctx2d.globalAlpha=natural?0.8:0.45;
-    ctx2d.fillStyle=inkDim;
-    ctx2d.fillText(name+(Math.floor(m/12)-1),6,y-1);
+    /* thin out labels when zoomed out so they don't overlap */
+    const showLabel = pxPer>=15 || (natural && pxPer>=8) || name==='C';
+    if(showLabel){
+      ctx2d.globalAlpha=natural?0.8:0.45;
+      ctx2d.fillStyle=inkDim;
+      ctx2d.fillText(name+(Math.floor(m/12)-1),6,y-1);
+    }
   }
   ctx2d.globalAlpha=1;
 
