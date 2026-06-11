@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="nl" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Zuiver — intonatiehulp voor cello</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#161210">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#161210;
+  --bg-raise:#1f1916;
+  --line:#372c24;
+  --ink:#efe5d6;
+  --ink-dim:#a89880;
+  --varnish:#d99a4e;
+  --varnish-soft:#8a6437;
+  --good:#8fbf7a;
+  --warn:#d9a04e;
+  --bad:#c95f4d;
+  --string-idle:#5b4a3a;
+  --shadow:rgba(0,0,0,.45);
+}
+[data-theme="light"]{
+  --bg:#f3ead9;
+  --bg-raise:#fbf5e8;
+  --line:#d9c9ae;
+  --ink:#3a2c1e;
+  --ink-dim:#8a7559;
+  --varnish:#b06f23;
+  --varnish-soft:#cfa46b;
+  --good:#4f8c3c;
+  --warn:#b07a23;
+  --bad:#b2492f;
+  --string-idle:#c4ad8a;
+  --shadow:rgba(90,60,20,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--ink);
+  font-family:'Outfit',system-ui,sans-serif;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  transition:background .3s,color .3s;
+  touch-action:manipulation;
+}
+
+/* ───── header ───── */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 14px 6px;
+  gap:10px;
+}
+.brand{font-family:'Fraunces',serif;font-weight:600;font-size:1.15rem;letter-spacing:.02em}
+.brand small{display:block;font-family:'Outfit';font-weight:300;font-size:.62rem;color:var(--ink-dim);letter-spacing:.14em;text-transform:uppercase}
+.hdr-controls{display:flex;align-items:center;gap:8px}
+.a4-box{
+  display:flex;align-items:center;gap:2px;
+  background:var(--bg-raise);border:1px solid var(--line);border-radius:10px;
+  padding:3px 4px;
+}
+.a4-box button{
+  width:26px;height:26px;border:none;background:none;color:var(--varnish);
+  font-size:1.05rem;font-weight:600;cursor:pointer;border-radius:7px;font-family:'Outfit';
+}
+.a4-box button:active{background:var(--line)}
+.a4-val{font-size:.78rem;min-width:62px;text-align:center;color:var(--ink)}
+.a4-val b{font-weight:600}
+#themeBtn{
+  width:34px;height:34px;border:1px solid var(--line);background:var(--bg-raise);
+  border-radius:10px;color:var(--ink-dim);font-size:1rem;cursor:pointer;
+}
+
+/* ───── strings indicator (signature) ───── */
+.strings{
+  display:flex;justify-content:center;gap:46px;
+  padding:8px 0 2px;position:relative;
+}
+.string{
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  width:30px;
+}
+.string .wire{
+  width:var(--w,3px);height:34px;border-radius:3px;
+  background:var(--string-idle);
+  transition:background .15s, box-shadow .15s;
+}
+.string.active .wire{
+  background:var(--varnish);
+  box-shadow:0 0 10px var(--varnish);
+  animation:vibrate .09s linear infinite alternate;
+}
+@keyframes vibrate{from{transform:translateX(-1.1px) scaleX(1.4)}to{transform:translateX(1.1px) scaleX(1.4)}}
+.string span{font-size:.72rem;letter-spacing:.1em;color:var(--ink-dim);transition:color .15s}
+.string.active span{color:var(--varnish);font-weight:600}
+@media (prefers-reduced-motion:reduce){.string.active .wire{animation:none}}
+
+/* ───── note display ───── */
+.note-area{
+  text-align:center;
+  padding:2px 0 0;
+  min-height:108px;
+  transition:opacity .4s;
+}
+.note-area.idle{opacity:.32}
+.note-name{
+  font-family:'Fraunces',serif;font-weight:500;
+  font-size:4.6rem;line-height:1;
+  display:inline-flex;align-items:baseline;
+}
+.note-name sub{font-size:1.4rem;color:var(--ink-dim);margin-left:2px}
+.cents-read{
+  font-size:.95rem;margin-top:2px;letter-spacing:.03em;color:var(--ink-dim);
+  font-variant-numeric:tabular-nums;
+}
+.cents-read b{font-weight:600}
+.cents-read.good b{color:var(--good)}
+.cents-read.warn b{color:var(--warn)}
+.cents-read.bad b{color:var(--bad)}
+.freq-read{font-size:.7rem;color:var(--ink-dim);opacity:.75;margin-top:1px;font-variant-numeric:tabular-nums}
+
+/* ───── meter ───── */
+.meter{
+  position:relative;
+  margin:8px 18px 4px;
+  height:58px;
+}
+.meter .scale{position:absolute;inset:0}
+.meter .band{
+  position:absolute;top:18px;left:0;right:0;height:8px;border-radius:4px;
+  background:linear-gradient(90deg,var(--bad) 0%,var(--warn) 28%,transparent 42%,transparent 58%,var(--warn) 72%,var(--bad) 100%);
+  opacity:.5;
+}
+.meter .green-zone{
+  position:absolute;top:16px;left:45%;width:10%;height:12px;border-radius:6px;
+  background:var(--good);opacity:.35;
+}
+.meter .tick{position:absolute;top:30px;width:1px;height:7px;background:var(--ink-dim);opacity:.5}
+.meter .tick.zero{height:12px;width:2px;top:28px;background:var(--ink);opacity:.9}
+.meter .ticklbl{position:absolute;top:40px;font-size:.58rem;color:var(--ink-dim);transform:translateX(-50%)}
+.needle{
+  position:absolute;top:4px;left:50%;width:3px;height:34px;border-radius:2px;
+  background:var(--ink);
+  transform:translateX(-50%);
+  transition:background .12s;
+  will-change:transform;
+}
+.needle::after{
+  content:"";position:absolute;top:-5px;left:50%;transform:translateX(-50%);
+  border:5px solid transparent;border-top:7px solid currentColor;
+  color:inherit;
+}
+.needle.good{background:var(--good);color:var(--good)}
+.needle.warn{background:var(--warn);color:var(--warn)}
+.needle.bad{background:var(--bad);color:var(--bad)}
+
+/* ───── trace ───── */
+.trace-wrap{
+  flex:1;min-height:120px;
+  margin:6px 12px 8px;
+  border:1px solid var(--line);border-radius:14px;
+  background:var(--bg-raise);
+  position:relative;overflow:hidden;
+  box-shadow:0 2px 14px var(--shadow);
+}
+#trace{position:absolute;inset:0;width:100%;height:100%}
+.trace-label{
+  position:absolute;top:7px;right:11px;font-size:.6rem;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--ink-dim);pointer-events:none;
+}
+
+/* ───── footer / sensitivity ───── */
+.footer{
+  padding:6px 18px 14px;
+  display:flex;align-items:center;gap:12px;
+}
+.footer label{font-size:.7rem;color:var(--ink-dim);letter-spacing:.06em;white-space:nowrap}
+input[type=range]{
+  flex:1;-webkit-appearance:none;appearance:none;height:4px;border-radius:2px;
+  background:var(--line);outline:none;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:50%;
+  background:var(--varnish);border:3px solid var(--bg);box-shadow:0 1px 5px var(--shadow);
+  cursor:pointer;
+}
+#micState{font-size:.68rem;color:var(--ink-dim);min-width:56px;text-align:right}
+#micState.live{color:var(--good)}
+
+/* ───── start overlay ───── */
+.overlay{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:30px;text-align:center;z-index:10;
+  transition:opacity .35s;
+}
+.overlay.hidden{opacity:0;pointer-events:none}
+.overlay h1{font-family:'Fraunces',serif;font-weight:600;font-size:2.4rem}
+.overlay h1 em{font-style:normal;color:var(--varnish)}
+.overlay p{max-width:300px;color:var(--ink-dim);font-size:.92rem;line-height:1.55;font-weight:300}
+.overlay .ov-strings{display:flex;gap:22px;margin-bottom:4px}
+.overlay .ov-strings i{display:block;width:3px;height:54px;border-radius:2px;background:var(--varnish-soft)}
+.overlay .ov-strings i:nth-child(1){width:5px}
+.overlay .ov-strings i:nth-child(2){width:4px}
+.overlay .ov-strings i:nth-child(4){width:2px}
+#startBtn{
+  font-family:'Outfit';font-size:1.02rem;font-weight:600;letter-spacing:.04em;
+  padding:15px 38px;border-radius:14px;border:none;cursor:pointer;
+  background:var(--varnish);color:#1c130a;
+  box-shadow:0 4px 18px var(--shadow);
+}
+#startBtn:active{transform:scale(.97)}
+#errMsg{color:var(--bad);font-size:.82rem;max-width:300px;display:none}
+</style>
+</head>
+<body>
+
+<div class="overlay" id="overlay">
+  <div class="ov-strings"><i></i><i></i><i></i><i></i></div>
+  <h1>Zui<em>ver</em></h1>
+  <p>Intonatiehulp voor cello. Speel een noot en zie direct of je zuiver bent — met meter, notennaam en een meelopend toonhoogtespoor.<br><br>Referentie: a&prime;&nbsp;=&nbsp;442&nbsp;Hz (instelbaar).</p>
+  <button id="startBtn">Start microfoon</button>
+  <p id="errMsg"></p>
+</div>
+
+<header>
+  <div class="brand">Zuiver<small>cello · intonatie</small></div>
+  <div class="hdr-controls">
+    <div class="a4-box">
+      <button id="a4minus" aria-label="A4 verlagen">−</button>
+      <div class="a4-val">a&prime; = <b id="a4val">442</b> Hz</div>
+      <button id="a4plus" aria-label="A4 verhogen">+</button>
+    </div>
+    <button id="themeBtn" aria-label="Wissel thema">☀</button>
+  </div>
+</header>
+
+<div class="strings" id="stringsRow">
+  <div class="string" data-s="C" style="--w:5px"><div class="wire"></div><span>C</span></div>
+  <div class="string" data-s="G" style="--w:4px"><div class="wire"></div><span>G</span></div>
+  <div class="string" data-s="D" style="--w:3px"><div class="wire"></div><span>D</span></div>
+  <div class="string" data-s="A" style="--w:2px"><div class="wire"></div><span>A</span></div>
+</div>
+
+<div class="note-area idle" id="noteArea">
+  <div class="note-name"><span id="noteName">—</span><sub id="noteOct"></sub></div>
+  <div class="cents-read" id="centsRead"><b>·</b></div>
+  <div class="freq-read" id="freqRead">&nbsp;</div>
+</div>
+
+<div class="meter" id="meter">
+  <div class="scale" id="meterScale">
+    <div class="band"></div>
+    <div class="green-zone"></div>
+  </div>
+  <div class="needle" id="needle"></div>
+</div>
+
+<div class="trace-wrap">
+  <canvas id="trace"></canvas>
+  <div class="trace-label">toonhoogtespoor · 8 s</div>
+</div>
+
+<div class="footer">
+  <label for="sens">Gevoeligheid</label>
+  <input type="range" id="sens" min="1" max="10" step="1" value="6">
+  <span id="micState">uit</span>
+</div>
+
+<script>
+"use strict";
+/* ============ state ============ */
+let A4 = 442;
+let audioCtx=null, analyser=null, buf=null;
+let running=false;
+let rmsThreshold=0.008;
+const NOTE_NAMES=['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+const OPEN_STRINGS=[{n:'C',m:36},{n:'G',m:43},{n:'D',m:50},{n:'A',m:57}];
+
+/* display smoothing */
+let smCents=0, lastGood=0, lastDetectT=0;
+let recentFreqs=[];
+
+/* trace data: {t, midi, cents} or {t, midi:null} for gaps */
+const samples=[];
+const TRACE_SEC=8;
+let viewCenter=50; /* midi center of trace view (D3) */
+
+/* ============ dom ============ */
+const $=id=>document.getElementById(id);
+const overlay=$('overlay'), startBtn=$('startBtn'), errMsg=$('errMsg');
+const noteArea=$('noteArea'), noteName=$('noteName'), noteOct=$('noteOct');
+const centsRead=$('centsRead'), freqRead=$('freqRead');
+const needle=$('needle'), micState=$('micState');
+const canvas=$('trace'), ctx2d=canvas.getContext('2d');
+
+/* meter ticks */
+(function(){
+  const scale=$('meterScale');
+  for(let c=-50;c<=50;c+=10){
+    const x=50 + c; /* percent: -50c→0%, +50c→100% */
+    const t=document.createElement('div');
+    t.className='tick'+(c===0?' zero':'');
+    t.style.left=x+'%';
+    scale.appendChild(t);
+    if(c%25===0){
+      const l=document.createElement('div');
+      l.className='ticklbl'; l.style.left=x+'%';
+      l.textContent=(c>0?'+':'')+c;
+      scale.appendChild(l);
+    }
+  }
+})();
+
+/* ============ controls ============ */
+$('a4minus').onclick=()=>{A4=Math.max(430,A4-1);$('a4val').textContent=A4;};
+$('a4plus').onclick=()=>{A4=Math.min(450,A4+1);$('a4val').textContent=A4;};
+$('themeBtn').onclick=()=>{
+  const html=document.documentElement;
+  const dark=html.dataset.theme==='dark';
+  html.dataset.theme=dark?'light':'dark';
+  $('themeBtn').textContent=dark?'☾':'☀';
+};
+$('sens').oninput=e=>{
+  const s=+e.target.value; /* 1..10 */
+  rmsThreshold=0.045*Math.pow(0.0018/0.045,(s-1)/9);
+};
+$('sens').oninput({target:$('sens')});
+
+/* ============ audio ============ */
+startBtn.onclick=async()=>{
+  errMsg.style.display='none';
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false,noiseSuppression:false,autoGainControl:false
+    }});
+    audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(stream);
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=4096;
+    src.connect(analyser);
+    buf=new Float32Array(analyser.fftSize);
+    running=true;
+    keepAwake();
+    micState.textContent='live';
+    micState.classList.add('live');
+    overlay.classList.add('hidden');
+    requestAnimationFrame(loop);
+  }catch(err){
+    errMsg.style.display='block';
+    errMsg.textContent='Geen toegang tot de microfoon. Sta microfoongebruik toe in je browser (instellingen → site-instellingen → microfoon) en probeer opnieuw.';
+  }
+};
+
+/* ============ pitch detection (autocorrelation, lag-limited) ============ */
+function detectPitch(b,sr){
+  const N=b.length;
+  let rms=0;
+  for(let i=0;i<N;i++) rms+=b[i]*b[i];
+  rms=Math.sqrt(rms/N);
+  if(rms<rmsThreshold) return -1;
+
+  const W=2048;
+  const minLag=Math.max(24,Math.floor(sr/1200));
+  const maxLag=Math.min(N-W-1,Math.floor(sr/50));
+  let e0=0;
+  for(let i=0;i<W;i++) e0+=b[i]*b[i];
+  if(e0<=0) return -1;
+
+  const corr=new Float32Array(maxLag+1);
+  for(let lag=minLag;lag<=maxLag;lag++){
+    let sum=0;
+    for(let i=0;i<W;i++) sum+=b[i]*b[i+lag];
+    corr[lag]=sum;
+  }
+  /* descend past initial peak */
+  let d=minLag;
+  while(d<maxLag&&corr[d]>corr[d+1])d++;
+  let best=0,bestLag=-1;
+  for(let lag=d;lag<=maxLag;lag++){
+    if(corr[lag]>best){best=corr[lag];bestLag=lag;}
+  }
+  if(bestLag<0||best<0.30*e0) return -1;
+
+  /* octave-error correction: prefer shorter period if nearly as strong */
+  for(let k=4;k>=2;k--){
+    const l2=Math.round(bestLag/k);
+    if(l2>=minLag&&corr[l2]>0.88*best){bestLag=l2;best=corr[l2];break;}
+  }
+  /* parabolic interpolation */
+  const c0=corr[bestLag-1]??best, c1=best, c2=corr[bestLag+1]??best;
+  const den=c0-2*c1+c2;
+  const shift=den===0?0:0.5*(c0-c2)/den;
+  const period=bestLag+shift;
+  const f=sr/period;
+  if(f<50||f>1300) return -1;
+  return f;
+}
+
+/* ============ helpers ============ */
+function midiFromFreq(f){return 69+12*Math.log2(f/A4);}
+function freqFromMidi(m){return A4*Math.pow(2,(m-69)/12);}
+function median(a){const s=[...a].sort((x,y)=>x-y);return s[(s.length-1)>>1];}
+
+function setStrings(midi){
+  let active=null;
+  if(midi!==null){
+    for(const s of OPEN_STRINGS) if(midi>=s.m-0.6) active=s.n;
+    if(active===null) active='C';
+  }
+  document.querySelectorAll('.string').forEach(el=>{
+    el.classList.toggle('active',el.dataset.s===active);
+  });
+}
+
+/* ============ main loop ============ */
+let lastDetect=0;
+function loop(now){
+  if(!running)return;
+  requestAnimationFrame(loop);
+
+  /* throttle detection to ~33ms */
+  if(now-lastDetect>=33){
+    lastDetect=now;
+    analyser.getFloatTimeDomainData(buf);
+    const f=detectPitch(buf,audioCtx.sampleRate);
+    const t=now/1000;
+
+    if(f>0){
+      recentFreqs.push(f);
+      if(recentFreqs.length>4)recentFreqs.shift();
+      const fm=median(recentFreqs);
+      const midi=midiFromFreq(fm);
+      const nearest=Math.round(midi);
+      const cents=(midi-nearest)*100;
+      samples.push({t,midi,cents});
+      lastDetectT=t;
+      updateNoteDisplay(fm,nearest,cents);
+      setStrings(midi);
+    }else{
+      recentFreqs.length=0;
+      samples.push({t,midi:null});
+    }
+    /* prune */
+    while(samples.length&&samples[0].t<now/1000-TRACE_SEC-1)samples.shift();
+
+    /* idle fade */
+    const idle=(now/1000-lastDetectT)>0.5;
+    noteArea.classList.toggle('idle',idle);
+    if(idle)setStrings(null);
+  }
+
+  /* needle smoothing every frame */
+  needle.style.left=(50+Math.max(-50,Math.min(50,smCents)))+'%';
+  needle.style.transform='translateX(-50%)';
+
+  drawTrace(now/1000);
+}
+
+function updateNoteDisplay(f,nearestMidi,cents){
+  const name=NOTE_NAMES[((nearestMidi%12)+12)%12];
+  const oct=Math.floor(nearestMidi/12)-1;
+  noteName.textContent=name;
+  noteOct.textContent=oct;
+  smCents+=(cents-smCents)*0.45;
+  const ac=Math.abs(cents);
+  const cls=ac<=5?'good':(ac<=15?'warn':'bad');
+  needle.className='needle '+cls;
+  centsRead.className='cents-read '+cls;
+  centsRead.innerHTML='<b>'+(cents>=0?'+':'')+cents.toFixed(0)+' cents</b>';
+  freqRead.textContent=f.toFixed(1)+' Hz · doel '+freqFromMidi(nearestMidi).toFixed(1)+' Hz';
+}
+
+/* ============ trace drawing ============ */
+function resizeCanvas(){
+  const dpr=window.devicePixelRatio||1;
+  const r=canvas.getBoundingClientRect();
+  canvas.width=r.width*dpr;canvas.height=r.height*dpr;
+  ctx2d.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resizeCanvas);
+resizeCanvas();
+
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+function drawTrace(tNow){
+  const r=canvas.getBoundingClientRect();
+  const W=r.width,H=r.height;
+  if(W===0)return;
+  ctx2d.clearRect(0,0,W,H);
+
+  /* auto-pan view center toward recent median */
+  const recent=samples.filter(s=>s.midi!==null&&s.t>tNow-2).map(s=>s.midi);
+  if(recent.length>2){
+    const tgt=median(recent);
+    viewCenter+=(tgt-viewCenter)*0.06;
+  }
+  const SPAN=9; /* semitones visible */
+  const mTop=viewCenter+SPAN/2, mBot=viewCenter-SPAN/2;
+  const yOf=m=>H*(mTop-m)/SPAN;
+  const xOf=t=>W*(1-(tNow-t)/TRACE_SEC);
+
+  const inkDim=cssVar('--ink-dim'),line=cssVar('--line');
+  const good=cssVar('--good'),warn=cssVar('--warn'),bad=cssVar('--bad');
+
+  /* semitone gridlines + labels */
+  ctx2d.font='10px Outfit, sans-serif';
+  ctx2d.textBaseline='middle';
+  for(let m=Math.ceil(mBot);m<=Math.floor(mTop);m++){
+    const y=yOf(m);
+    const name=NOTE_NAMES[((m%12)+12)%12];
+    const natural=!name.includes('♯')&&!name.includes('♭');
+    ctx2d.strokeStyle=line;
+    ctx2d.globalAlpha=natural?0.9:0.35;
+    ctx2d.lineWidth=natural?1:0.5;
+    ctx2d.beginPath();ctx2d.moveTo(0,y);ctx2d.lineTo(W,y);ctx2d.stroke();
+    ctx2d.globalAlpha=natural?0.8:0.45;
+    ctx2d.fillStyle=inkDim;
+    ctx2d.fillText(name+(Math.floor(m/12)-1),6,y-1);
+  }
+  ctx2d.globalAlpha=1;
+
+  /* trace */
+  ctx2d.lineWidth=2.4;
+  ctx2d.lineCap='round';
+  let prev=null;
+  for(const s of samples){
+    if(s.t<tNow-TRACE_SEC){prev=null;continue;}
+    if(s.midi===null){prev=null;continue;}
+    if(prev&&(s.t-prev.t)<0.18){
+      const ac=Math.abs(s.cents);
+      ctx2d.strokeStyle=ac<=5?good:(ac<=15?warn:bad);
+      ctx2d.beginPath();
+      ctx2d.moveTo(xOf(prev.t),yOf(prev.midi));
+      ctx2d.lineTo(xOf(s.t),yOf(s.midi));
+      ctx2d.stroke();
+    }
+    prev=s;
+  }
+  /* current dot */
+  if(prev&&tNow-prev.t<0.25){
+    const ac=Math.abs(prev.cents);
+    ctx2d.fillStyle=ac<=5?good:(ac<=15?warn:bad);
+    ctx2d.beginPath();
+    ctx2d.arc(xOf(prev.t),yOf(prev.midi),4.5,0,Math.PI*2);
+    ctx2d.fill();
+  }
+}
+/* ============ PWA: service worker ============ */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  });
+}
+
+/* ============ scherm aan tijdens het spelen ============ */
+let wakeLock=null;
+async function keepAwake(){
+  try{ if('wakeLock' in navigator) wakeLock=await navigator.wakeLock.request('screen'); }catch(e){}
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&running) keepAwake();
+});
+</script>
+</body>
+</html>
